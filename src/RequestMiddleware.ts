@@ -1,4 +1,4 @@
-import { EndpointErrors } from "@simonbackx/simple-endpoints";
+import { EndpointErrors } from "@simonbackx/simple-endpoints/dist/src/EndpointErrors";
 
 import { Request } from "./Request";
 

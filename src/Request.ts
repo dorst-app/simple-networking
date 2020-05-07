@@ -1,6 +1,6 @@
 // Requests use middleware to extend its behaviour
 import { Decoder, Encodeable, isEncodeable, ObjectData } from "@simonbackx/simple-encoding";
-import { EndpointErrors } from "@simonbackx/simple-endpoints";
+import { EndpointErrors } from "@simonbackx/simple-endpoints/dist/src/EndpointErrors";
 
 import { RequestMiddleware } from "./RequestMiddleware";
 import { Server } from "./Server";
