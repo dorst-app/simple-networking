@@ -95,10 +95,19 @@ export class Request<T> {
                 }
             }
 
-            console.log("Starting new reuest");
-            console.log("New request", this.method, this.path, this.body);
+            let queryString = "";
+            if (this.query && Object.keys(this.query).length > 0) {
+                queryString =
+                    "?" +
+                    Object.keys(this.query)
+                        .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(this.query[k]))
+                        .join("&");
+            }
 
-            response = await fetch(this.server.host + this.path, {
+            console.log("Starting new reuest");
+            console.log("New request", this.method, this.path, this.body, this.query);
+
+            response = await fetch(this.server.host + this.path + queryString, {
                 method: this.method,
                 headers: this.headers,
                 body: body,
