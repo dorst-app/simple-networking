@@ -41,7 +41,7 @@ export class Request<T> {
      * Content that will get encoded in the body of the request (only for non GET requests)
      * Should be FormData (use this for uploading files) or it will get encoded as JSON
      */
-    body: any | Encodeable | FormData | undefined;
+    body: any | Encodeable | Encodeable[] | FormData | undefined;
 
     /// Shared middlewares that allows dependency injection here
     static sharedMiddlewares: RequestMiddleware[] = [];
@@ -109,7 +109,7 @@ export class Request<T> {
             }
 
             console.log("Starting new reuest");
-            console.log("New request", this.method, this.path, this.body, this.query);
+            console.log("New request", this.method, this.path, this.body, this.query, this.headers);
 
             response = await fetch(this.server.host + this.path + queryString, {
                 method: this.method,
