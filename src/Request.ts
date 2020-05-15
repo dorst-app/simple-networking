@@ -19,7 +19,7 @@ export interface RequestInitializer<T> {
     method: HTTPMethod;
     path: string;
     query?: any;
-    body?: any | Encodeable | FormData;
+    body?: any | Encodeable | Encodeable[] | FormData;
     headers?: any;
     decoder?: Decoder<T>;
 }
@@ -87,10 +87,14 @@ export class Request<T> {
                 } else {
                     this.headers["Content-Type"] = "application/json";
 
-                    if (isEncodeable(this.body)) {
-                        body = JSON.stringify(this.body.encode());
+                    if (Array.isArray(this.body)) {
+                        body = JSON.stringify(this.body.map((e) => e.encode()));
                     } else {
-                        body = JSON.stringify(this.body);
+                        if (isEncodeable(this.body)) {
+                            body = JSON.stringify(this.body.encode());
+                        } else {
+                            body = JSON.stringify(this.body);
+                        }
                     }
                 }
             }

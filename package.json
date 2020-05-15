@@ -6,7 +6,8 @@
     "scripts": {
         "test": "jest",
         "build": "tsc -p . --declaration",
-        "lint": "eslint . --ext .js,.ts"
+        "lint": "eslint . --ext .js,.ts",
+        "prepublish": "build"
     },
     "files": [
         "dist"
