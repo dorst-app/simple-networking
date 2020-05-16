@@ -22,6 +22,7 @@ export interface RequestInitializer<T> {
     body?: any | Encodeable | Encodeable[] | FormData;
     headers?: any;
     decoder?: Decoder<T>;
+    version?: number;
 }
 
 export class Request<T> {
@@ -29,7 +30,7 @@ export class Request<T> {
     server: Server;
     path: string;
     method: HTTPMethod;
-
+    version?: number;
     headers: any;
 
     /**
@@ -59,6 +60,7 @@ export class Request<T> {
         this.body = request.body;
         this.decoder = request.decoder;
         this.headers = request.headers ?? {};
+        this.version = request.version;
     }
 
     getMiddlewares(): RequestMiddleware[] {
@@ -74,7 +76,7 @@ export class Request<T> {
         }
 
         let response: Response;
-        let version: number | undefined;
+        let version: number | undefined = this.version;
 
         try {
             let body: any;
@@ -90,10 +92,10 @@ export class Request<T> {
 
                     if (Array.isArray(this.body)) {
                         body = JSON.stringify(this.body.map((e) => e.encode(e.latestVersion)));
-                        version = this.body[0]?.latestVersion;
+                        version = version ?? this.body[0]?.latestVersion;
                     } else {
                         if (isEncodeable(this.body)) {
-                            version = this.body.latestVersion;
+                            version = version ?? this.body.latestVersion;
                             body = JSON.stringify(this.body.encode(this.body.latestVersion));
                         } else {
                             body = JSON.stringify(this.body);
