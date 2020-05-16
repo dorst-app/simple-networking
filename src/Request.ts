@@ -74,10 +74,10 @@ export class Request<T> {
         }
 
         let response: Response;
+        let version: number | undefined;
 
         try {
             let body: any;
-            let version: number | undefined;
 
             // We only support application/json or FormData for now
             if (this.body === undefined) {
@@ -189,7 +189,7 @@ export class Request<T> {
 
             // todo: add automatic decoding here, so we know we are receiving what we expected with typings
             if (this.decoder) {
-                const decoded = this.decoder?.decode(new ObjectData(json));
+                const decoded = this.decoder?.decode(new ObjectData(json, "", version));
                 console.info(decoded);
                 return new RequestResult(decoded);
             }
