@@ -77,6 +77,7 @@ export class Request<T> {
 
         try {
             let body: any;
+            let version: number | undefined;
 
             // We only support application/json or FormData for now
             if (this.body === undefined) {
@@ -88,15 +89,21 @@ export class Request<T> {
                     this.headers["Content-Type"] = "application/json";
 
                     if (Array.isArray(this.body)) {
-                        body = JSON.stringify(this.body.map((e) => e.encode()));
+                        body = JSON.stringify(this.body.map((e) => e.encode(e.latestVersion)));
+                        version = this.body[0]?.latestVersion;
                     } else {
                         if (isEncodeable(this.body)) {
-                            body = JSON.stringify(this.body.encode());
+                            version = this.body.latestVersion;
+                            body = JSON.stringify(this.body.encode(this.body.latestVersion));
                         } else {
                             body = JSON.stringify(this.body);
                         }
                     }
                 }
+            }
+
+            if (version) {
+                this.headers["X-Version"] = version;
             }
 
             let queryString = "";
