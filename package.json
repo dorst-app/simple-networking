@@ -15,7 +15,7 @@
         "registry": "https://npm.pkg.github.com/"
     },
     "dependencies": {
-        "@simonbackx/simple-encoding": "^1.5.0",
+        "@simonbackx/simple-encoding": "^1.6.0",
         "@simonbackx/simple-endpoints": "^1.1.3"
     },
     "devDependencies": {
