@@ -76,7 +76,6 @@ export class Request<T> {
         }
 
         let response: Response;
-        let version: number | undefined = this.version;
 
         try {
             let body: any;
@@ -91,12 +90,10 @@ export class Request<T> {
                     this.headers["Content-Type"] = "application/json";
 
                     if (Array.isArray(this.body)) {
-                        body = JSON.stringify(this.body.map((e) => e.encode(e.latestVersion)));
-                        version = version ?? this.body[0]?.latestVersion;
+                        body = JSON.stringify(this.body.map((e) => e.encode({ version: this.version ?? 0 })));
                     } else {
                         if (isEncodeable(this.body)) {
-                            version = version ?? this.body.latestVersion;
-                            body = JSON.stringify(this.body.encode(this.body.latestVersion));
+                            body = JSON.stringify(this.body.encode({ version: this.version ?? 0 }));
                         } else {
                             body = JSON.stringify(this.body);
                         }
@@ -104,9 +101,7 @@ export class Request<T> {
                 }
             }
 
-            if (version) {
-                this.headers["X-Version"] = version;
-            }
+            this.headers["X-Version"] = this.version ?? 0;
 
             let queryString = "";
             if (this.query && Object.keys(this.query).length > 0) {
