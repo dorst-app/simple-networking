@@ -150,7 +150,7 @@ export class Request<T> {
                 const json = await response.json();
                 let err: EndpointErrors;
                 try {
-                    err = EndpointErrors.decode(new ObjectData(json));
+                    err = EndpointErrors.decode(new ObjectData(json, { version: 0 }));
                     console.error(err);
                 } catch (e) {
                     // Failed to decode
@@ -186,7 +186,7 @@ export class Request<T> {
 
             // todo: add automatic decoding here, so we know we are receiving what we expected with typings
             if (this.decoder) {
-                const decoded = this.decoder?.decode(new ObjectData(json, "", version));
+                const decoded = this.decoder?.decode(new ObjectData(json, { version: this.version ?? 0 }));
                 console.info(decoded);
                 return new RequestResult(decoded);
             }
