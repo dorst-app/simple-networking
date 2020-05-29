@@ -145,6 +145,13 @@ export class Request<T> {
             throw error;
         }
 
+        for (const middleware of this.getMiddlewares()) {
+            // Update middleware of recovered network status
+            if (middleware.onNetworkResponse) {
+                middleware.onNetworkResponse(this, response);
+            }
+        }
+
         if (!response.ok) {
             if (response.headers.get("Content-Type") == "application/json") {
                 const json = await response.json();
