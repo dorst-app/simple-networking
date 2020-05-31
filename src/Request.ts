@@ -52,6 +52,8 @@ export class Request<T> {
 
     decoder: Decoder<T> | undefined;
 
+    static verbose = false;
+
     constructor(server: Server, request: RequestInitializer<T>) {
         this.server = server;
         this.method = request.method;
@@ -61,6 +63,10 @@ export class Request<T> {
         this.decoder = request.decoder;
         this.headers = request.headers ?? {};
         this.version = request.version;
+    }
+
+    get static(): typeof Request {
+        return this.constructor as typeof Request;
     }
 
     getMiddlewares(): RequestMiddleware[] {
@@ -112,8 +118,10 @@ export class Request<T> {
                         .join("&");
             }
 
-            console.log("Starting new reuest");
-            console.log("New request", this.method, this.path, this.body, this.query, this.headers);
+            if (this.static.verbose) {
+                console.log("Starting new reuest");
+                console.log("New request", this.method, this.path, this.body, this.query, this.headers);
+            }
 
             response = await fetch(this.server.host + this.path + queryString, {
                 method: this.method,
@@ -158,7 +166,9 @@ export class Request<T> {
                 let err: EndpointErrors;
                 try {
                     err = EndpointErrors.decode(new ObjectData(json, { version: 0 }));
-                    console.error(err);
+                    if (this.static.verbose) {
+                        console.error(err);
+                    }
                 } catch (e) {
                     // Failed to decode
                     console.error(json);
@@ -194,7 +204,9 @@ export class Request<T> {
             // todo: add automatic decoding here, so we know we are receiving what we expected with typings
             if (this.decoder) {
                 const decoded = this.decoder?.decode(new ObjectData(json, { version: this.version ?? 0 }));
-                console.info(decoded);
+                if (this.static.verbose) {
+                    console.info(decoded);
+                }
                 return new RequestResult(decoded);
             }
 
