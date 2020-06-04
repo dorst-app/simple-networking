@@ -28,20 +28,37 @@ export interface RequestInitializer<T> {
 function wrapTimeout<T>(promise: Promise<T>, timeout): Promise<T> {
     return new Promise((resolve, reject) => {
         let didTimeout = false;
-        promise.then(resolve, (e) => {
-            if (didTimeout) {
-                console.error("Timeout fetch got fetch error:");
-                console.error(e);
+        let didReject = false;
+
+        const timer = setTimeout(() => {
+            if (didReject) {
                 return;
             }
-            reject(e);
-        });
-
-        setTimeout(() => {
             console.error("Fetch timeout");
             didTimeout = true;
             reject(new Error("Timeout"));
         }, timeout);
+        promise.then(
+            (d) => {
+                if (didTimeout) {
+                    console.error("Got response after timeout :/");
+                    return;
+                }
+                didReject = true;
+                clearTimeout(timer);
+                resolve(d);
+            },
+            (e) => {
+                if (didTimeout) {
+                    console.error("Timeout fetch got fetch error:");
+                    console.error(e);
+                    return;
+                }
+                didReject = true;
+                reject(e);
+                clearTimeout(timer);
+            }
+        );
     });
 }
 
