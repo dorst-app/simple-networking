@@ -25,6 +25,26 @@ export interface RequestInitializer<T> {
     version?: number;
 }
 
+function wrapTimeout<T>(promise: Promise<T>, timeout): Promise<T> {
+    return new Promise((resolve, reject) => {
+        let didTimeout = false;
+        promise.then(resolve, (e) => {
+            if (didTimeout) {
+                console.error("Timeout fetch got fetch error:");
+                console.error(e);
+                return;
+            }
+            reject(e);
+        });
+
+        setTimeout(() => {
+            console.error("Fetch timeout");
+            didTimeout = true;
+            reject(new Error("Timeout"));
+        }, timeout);
+    });
+}
+
 export class Request<T> {
     /// Path, relative to API host
     server: Server;
@@ -123,12 +143,15 @@ export class Request<T> {
                 console.log("New request", this.method, this.path, this.body, this.query, this.headers);
             }
 
-            response = await fetch(this.server.host + this.path + queryString, {
-                method: this.method,
-                headers: this.headers,
-                body: body,
-                credentials: "omit",
-            });
+            response = await wrapTimeout(
+                fetch(this.server.host + this.path + queryString, {
+                    method: this.method,
+                    headers: this.headers,
+                    body: body,
+                    credentials: "omit",
+                }),
+                10000
+            );
         } catch (error) {
             // Todo: map the error in our own error types to make error handling easier
             // network error is encountered or CORS is misconfigured on the server-side
