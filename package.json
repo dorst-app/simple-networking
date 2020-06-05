@@ -2,6 +2,7 @@
     "name": "@simonbackx/simple-networking",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "sideEffects": false,
     "version": "1.2.5",
     "scripts": {
         "test": "jest",
