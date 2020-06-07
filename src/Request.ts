@@ -151,6 +151,7 @@ export class Request<T> {
                 queryString =
                     "?" +
                     Object.keys(this.query)
+                        .filter((k) => this.query[k] !== undefined)
                         .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(this.query[k]))
                         .join("&");
             }
