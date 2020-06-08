@@ -144,8 +144,6 @@ export class Request<T> {
                 }
             }
 
-            this.headers["X-Version"] = this.version ?? 0;
-
             let queryString = "";
             if (this.query && Object.keys(this.query).length > 0) {
                 queryString =
@@ -162,7 +160,7 @@ export class Request<T> {
             }
 
             response = await wrapTimeout(
-                fetch(this.server.host + this.path + queryString, {
+                fetch(this.server.host + "/v" + this.version + this.path + queryString, {
                     method: this.method,
                     headers: this.headers,
                     body: body,
