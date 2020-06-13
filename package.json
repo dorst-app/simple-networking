@@ -12,9 +12,6 @@
     "files": [
         "dist"
     ],
-    "publishConfig": {
-        "registry": "https://npm.pkg.github.com/"
-    },
     "dependencies": {
         "@simonbackx/simple-encoding": "^1.8.0",
         "@simonbackx/simple-endpoints": "^1.1.3"
