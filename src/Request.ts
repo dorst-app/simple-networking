@@ -25,8 +25,9 @@ export interface RequestInitializer<T> {
     version?: number;
 }
 
-function wrapTimeout<T>(promise: Promise<T>, timeout): Promise<T> {
+function wrapTimeout<T>(promise: Promise<T>, timeout: number, controller: AbortController): Promise<T> {
     return new Promise((resolve, reject) => {
+        // We keep track of timeout for browsers that do not support the abort api
         let didTimeout = false;
         let didReject = false;
 
@@ -34,8 +35,10 @@ function wrapTimeout<T>(promise: Promise<T>, timeout): Promise<T> {
             if (didReject) {
                 return;
             }
-            console.error("Fetch timeout");
+            console.error("Fetch timeout: abort with controller");
             didTimeout = true;
+            controller.abort()
+            // Need to reject after abort!
             reject(new Error("Timeout"));
         }, timeout);
         promise.then(
@@ -89,6 +92,9 @@ export class Request<T> {
 
     decoder: Decoder<T> | undefined;
 
+    /// Milliseconds for fetch to timeout
+    timeout?: number
+
     static verbose = false;
 
     constructor(server: Server, request: RequestInitializer<T>) {
@@ -119,6 +125,7 @@ export class Request<T> {
         }
 
         let response: Response;
+        let timeout = this.timeout ?? (this.method == "GET" ? 10 * 1000 : 15 * 10000)
 
         try {
             let body: any;
@@ -129,6 +136,19 @@ export class Request<T> {
             } else {
                 if (this.body instanceof FormData) {
                     body = this.body;
+                    let size = 0
+                    for (const [prop, value] of this.body.entries()) {
+                        if (typeof value === "string") {
+                            size += value.length
+                        } else {
+                            size += value.size
+                        }
+                    }
+
+                    if (size > 1000 * 1000 * 1000) {
+                        // > 1MB upload
+                        timeout = 60*1000
+                    }
                 } else {
                     this.headers["Content-Type"] = "application/json";
 
@@ -159,17 +179,26 @@ export class Request<T> {
                 console.log("New request", this.method, this.path, this.body, this.query, this.headers);
             }
 
+            const controller = new AbortController();
+            const signal = controller.signal;
+
             response = await wrapTimeout(
                 fetch(this.server.host + "/v" + this.version + this.path + queryString, {
                     method: this.method,
                     headers: this.headers,
                     body: body,
-                    credentials: "omit",
+                    signal,
+                    credentials: "omit"
                 }),
-                10000
+                timeout,
+                controller
             );
         } catch (error) {
-            // Todo: map the error in our own error types to make error handling easier
+            // Todo: map the error in o
+            if (error.message === 'Timeout') {
+                // Increase next timeout (note: upload will stay 1 minute)
+                this.timeout = 30*1000;
+            }
             // network error is encountered or CORS is misconfigured on the server-side
 
             // A middleware might decide here to interrupt the callback
