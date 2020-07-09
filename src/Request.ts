@@ -1,6 +1,6 @@
 // Requests use middleware to extend its behaviour
 import { Decoder, Encodeable, isEncodeable, ObjectData } from "@simonbackx/simple-encoding";
-import { EndpointErrors } from "@simonbackx/simple-endpoints/dist/src/EndpointErrors";
+import { SimpleErrors } from "@simonbackx/simple-errors";
 
 import { RequestMiddleware } from "./RequestMiddleware";
 import { Server } from "./Server";
@@ -231,9 +231,9 @@ export class Request<T> {
         if (!response.ok) {
             if (response.headers.get("Content-Type") == "application/json") {
                 const json = await response.json();
-                let err: EndpointErrors;
+                let err: SimpleErrors;
                 try {
-                    err = EndpointErrors.decode(new ObjectData(json, { version: 0 }));
+                    err = SimpleErrors.decode(new ObjectData(json, { version: 0 }));
                     if (this.static.verbose) {
                         console.error(err);
                     }
