@@ -23,6 +23,7 @@ export interface RequestInitializer<T> {
     headers?: any;
     decoder?: Decoder<T>;
     version?: number;
+    timeout?: number; // optional (in ms). Defaults to 10 - 15 seconds
 }
 
 function wrapTimeout<T>(promise: Promise<T>, timeout: number, controller: AbortController): Promise<T> {
@@ -106,6 +107,7 @@ export class Request<T> {
         this.decoder = request.decoder;
         this.headers = request.headers ?? {};
         this.version = request.version;
+        this.timeout = request.timeout;
     }
 
     get static(): typeof Request {
@@ -147,7 +149,7 @@ export class Request<T> {
 
                     if (size > 1000 * 1000 * 1000) {
                         // > 1MB upload
-                        timeout = 60*1000
+                        timeout = Math.max(timeout, 60*1000)
                     }
                 } else {
                     this.headers["Content-Type"] = "application/json";
@@ -197,7 +199,7 @@ export class Request<T> {
             // Todo: map the error in o
             if (error.message === 'Timeout') {
                 // Increase next timeout (note: upload will stay 1 minute)
-                this.timeout = 30*1000;
+                this.timeout = Math.max(timeout, 30*1000);
             }
             // network error is encountered or CORS is misconfigured on the server-side
 
