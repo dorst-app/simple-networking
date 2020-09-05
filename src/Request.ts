@@ -152,23 +152,31 @@ export class Request<T> {
                         timeout = Math.max(timeout, 60*1000)
                     }
                 } else {
-                    this.headers["Content-Type"] = "application/json";
-
-                    if (Array.isArray(this.body)) {
-                        body = JSON.stringify(this.body.map((e) => {
-                            if (isEncodeable(this.body)) {
-                                return e.encode({ version: this.version ?? 0 })
-                            } else {
-                                return e
-                            }
-                        }));
+                    if (this.headers["Content-Type"] && (this.headers["Content-Type"] as string).startsWith("application/x-www-form-urlencoded")) {
+                        body = Object.keys(this.body)
+                            .filter((k) => this.body[k] !== undefined)
+                            .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(this.body[k]))
+                            .join("&");
                     } else {
-                        if (isEncodeable(this.body)) {
-                            body = JSON.stringify(this.body.encode({ version: this.version ?? 0 }));
+                        this.headers["Content-Type"] = "application/json";
+
+                        if (Array.isArray(this.body)) {
+                            body = JSON.stringify(this.body.map((e) => {
+                                if (isEncodeable(this.body)) {
+                                    return e.encode({ version: this.version ?? 0 })
+                                } else {
+                                    return e
+                                }
+                            }));
                         } else {
-                            body = JSON.stringify(this.body);
+                            if (isEncodeable(this.body)) {
+                                body = JSON.stringify(this.body.encode({ version: this.version ?? 0 }));
+                            } else {
+                                body = JSON.stringify(this.body);
+                            }
                         }
                     }
+                    
                 }
             }
 
