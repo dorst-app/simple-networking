@@ -158,7 +158,7 @@ export class Request<T> {
                             .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(this.body[k]))
                             .join("&");
                     } else {
-                        this.headers["Content-Type"] = "application/json";
+                        this.headers["Content-Type"] = "application/json;charset=utf-8";
 
                         if (Array.isArray(this.body)) {
                             body = JSON.stringify(this.body.map((e) => {
