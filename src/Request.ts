@@ -155,7 +155,13 @@ export class Request<T> {
                     this.headers["Content-Type"] = "application/json";
 
                     if (Array.isArray(this.body)) {
-                        body = JSON.stringify(this.body.map((e) => e.encode({ version: this.version ?? 0 })));
+                        body = JSON.stringify(this.body.map((e) => {
+                            if (isEncodeable(this.body)) {
+                                return e.encode({ version: this.version ?? 0 })
+                            } else {
+                                return e
+                            }
+                        }));
                     } else {
                         if (isEncodeable(this.body)) {
                             body = JSON.stringify(this.body.encode({ version: this.version ?? 0 }));
@@ -185,7 +191,7 @@ export class Request<T> {
             const signal = controller.signal;
 
             response = await wrapTimeout(
-                fetch(this.server.host + "/v" + this.version + this.path + queryString, {
+                fetch(this.server.host + (this.version !== undefined ? ("/v" + this.version) : "") + this.path + queryString, {
                     method: this.method,
                     headers: this.headers,
                     body: body,
