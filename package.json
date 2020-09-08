@@ -12,7 +12,8 @@
         "lint": "eslint . --ext .js,.ts"
     },
     "files": [
-        "dist"
+        "dist",
+        "commonjs/dist"
     ],
     "dependencies": {},
     "peerDependencies": {
