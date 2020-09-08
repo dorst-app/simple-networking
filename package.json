@@ -1,12 +1,14 @@
 {
     "name": "@simonbackx/simple-networking",
-    "main": "./dist/index.js",
+    "main": "./commonjs/dist/index.js",
+    "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "sideEffects": false,
     "version": "1.3.7",
     "scripts": {
         "test": "jest",
-        "build": "tsc -p . --declaration",
+        "build": " tsc -b . commonjs",
+        "build:full": "rm -r ./dist && rm -r ./commonjs/dist && tsc -b . commonjs",
         "lint": "eslint . --ext .js,.ts"
     },
     "files": [
