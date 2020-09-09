@@ -92,6 +92,7 @@ export class Request<T> {
     middlewares: RequestMiddleware[] = [];
 
     decoder: Decoder<T> | undefined;
+    errorDecoder: Decoder<SimpleErrors> | undefined = SimpleErrors
 
     /// Milliseconds for fetch to timeout
     timeout?: number
@@ -247,17 +248,22 @@ export class Request<T> {
         if (!response.ok) {
             if (response.headers.get("Content-Type") == "application/json") {
                 const json = await response.json();
-                let err: SimpleErrors;
-                try {
-                    err = SimpleErrors.decode(new ObjectData(json, { version: 0 }));
-                    if (this.static.verbose) {
-                        console.error(err);
+                let err: SimpleErrors | any;
+
+                if (this.errorDecoder) {
+                    try {
+                        err = this.errorDecoder.decode(new ObjectData(json, { version: 0 }));
+                        if (this.static.verbose) {
+                            console.error(err);
+                        }
+                    } catch (e) {
+                        // Failed to decode
+                        console.error(json);
+                        console.error(e);
+                        throw new Error("Bad request with invalid json error");
                     }
-                } catch (e) {
-                    // Failed to decode
-                    console.error(json);
-                    console.error(e);
-                    throw new Error("Bad request with invalid json error");
+                } else {
+                    err = json
                 }
 
                 // A middleware might decide here to retry instead of passing the error to the caller
