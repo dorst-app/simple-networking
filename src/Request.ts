@@ -26,46 +26,6 @@ export interface RequestInitializer<T> {
     timeout?: number; // optional (in ms). Defaults to 10 - 15 seconds
 }
 
-function wrapTimeout<T>(promise: Promise<T>, timeout: number, controller: AbortController): Promise<T> {
-    return new Promise((resolve, reject) => {
-        // We keep track of timeout for browsers that do not support the abort api
-        let didTimeout = false;
-        let didReject = false;
-
-        const timer = setTimeout(() => {
-            if (didReject) {
-                return;
-            }
-            console.error("Fetch timeout: abort with controller");
-            didTimeout = true;
-            controller.abort()
-            // Need to reject after abort!
-            reject(new Error("Timeout"));
-        }, timeout);
-        promise.then(
-            (d) => {
-                if (didTimeout) {
-                    console.error("Got response after timeout :/");
-                    return;
-                }
-                didReject = true;
-                clearTimeout(timer);
-                resolve(d);
-            },
-            (e) => {
-                if (didTimeout) {
-                    console.error("Timeout fetch got fetch error:");
-                    console.error(e);
-                    return;
-                }
-                didReject = true;
-                reject(e);
-                clearTimeout(timer);
-            }
-        );
-    });
-}
-
 export class Request<T> {
     /// Path, relative to API host
     server: Server;
@@ -119,6 +79,71 @@ export class Request<T> {
         return Request.sharedMiddlewares.concat(this.middlewares);
     }
 
+    private async fetch(data: {
+        method: HTTPMethod;
+        url: string;
+        body: string | Document | Blob | ArrayBufferView | ArrayBuffer | FormData | URLSearchParams | ReadableStream<Uint8Array> | null | undefined;
+        headers: any;
+        timeout: number;
+    }): Promise<XMLHttpRequest> {
+        return new Promise((resolve, reject) => {
+            try {
+                const request = new XMLHttpRequest();
+                let finished = false
+
+                request.onreadystatechange = (e: Event) => {
+                    if (finished) {
+                        // ignore duplicate events
+                        return
+                    }
+                    if (request.readyState == 4) {
+                        if (request.status == 0) {
+                            // should call handleError or handleTimeout
+                            return;
+                        }
+                
+                        finished = true
+                        resolve(request)
+                    }
+                };
+        
+                request.ontimeout = (e: ProgressEvent) => {
+                    if (finished) {
+                        // ignore duplicate events
+                        return
+                    }
+                    finished = true
+                    reject(new Error("Timeout"))
+                };
+        
+                request.onerror = (e: ProgressEvent) => {
+                    if (finished) {
+                        // ignore duplicate events
+                        return
+                    }
+                    // Your request timed out
+                    finished = true
+                    reject(e)
+                };
+                
+                request.open(data.method, data.url)
+
+                for (const key in data.headers) {
+                    if (Object.prototype.hasOwnProperty.call(data.headers, key)) {
+                        const value = data.headers[key];
+                        request.setRequestHeader(key, value);
+                    }
+                }
+
+                request.timeout = data.timeout
+
+                request.send(data.body)
+            } catch (e) {
+                reject(e)
+            }
+        })
+    }
+
     async start(): Promise<RequestResult<T>> {
         // todo: check if already running or not
 
@@ -127,7 +152,7 @@ export class Request<T> {
             if (middleware.onBeforeRequest) await middleware.onBeforeRequest(this);
         }
 
-        let response: Response;
+        let response: XMLHttpRequest;
         let timeout = this.timeout ?? (this.method == "GET" ? 10 * 1000 : 15 * 10000)
 
         try {
@@ -196,20 +221,14 @@ export class Request<T> {
                 console.log("New request", this.method, this.path, this.body, this.query, this.headers);
             }
 
-            const controller = new AbortController();
-            const signal = controller.signal;
+            response = await this.fetch({
+                url: this.server.host + (this.version !== undefined ? ("/v" + this.version) : "") + this.path + queryString,
+                method: this.method,
+                headers: this.headers,
+                body,
+                timeout
+            })
 
-            response = await wrapTimeout(
-                fetch(this.server.host + (this.version !== undefined ? ("/v" + this.version) : "") + this.path + queryString, {
-                    method: this.method,
-                    headers: this.headers,
-                    body: body,
-                    signal,
-                    credentials: "omit"
-                }),
-                timeout,
-                controller
-            );
         } catch (error) {
             // Todo: map the error in o
             if (error.message === 'Timeout') {
@@ -245,25 +264,31 @@ export class Request<T> {
             }
         }
 
-        if (!response.ok) {
-            if (response.headers.get("Content-Type") == "application/json") {
-                const json = await response.json();
+        if (response.status < 200 || response.status >= 300) {
+            if (response.getResponseHeader("Content-Type") === "application/json") {
                 let err: SimpleErrors | any;
 
-                if (this.errorDecoder) {
-                    try {
-                        err = this.errorDecoder.decode(new ObjectData(json, { version: 0 }));
-                        if (this.static.verbose) {
-                            console.error(err);
+                try {
+                    const json = JSON.parse(response.response)
+
+                    if (this.errorDecoder) {
+                        try {
+                            err = this.errorDecoder.decode(new ObjectData(json, { version: 0 }));
+                            if (this.static.verbose) {
+                                console.error(err);
+                            }
+                        } catch (e) {
+                            // Failed to decode
+                            if (this.static.verbose) {
+                                console.error(json);
+                            }
+                            throw e
                         }
-                    } catch (e) {
-                        // Failed to decode
-                        console.error(json);
-                        console.error(e);
-                        throw new Error("Bad request with invalid json error");
+                    } else {
+                        err = json
                     }
-                } else {
-                    err = json
+                } catch (e) {
+                    return await this.retryOrThrowServerError(response, e)
                 }
 
                 // A middleware might decide here to retry instead of passing the error to the caller
@@ -283,13 +308,18 @@ export class Request<T> {
                 throw err;
             }
 
-            // Todo: add retry handlers
-
-            throw new Error("Bad request");
+            // A non 200 status code without json header is always considered as a server error.
+            return await this.retryOrThrowServerError(response, new Error(response.response))
         }
 
-        if (response.headers.get("Content-Type") == "application/json") {
-            const json = await response.json();
+        if (response.getResponseHeader("Content-Type") === "application/json") {
+            let json: any
+            try {
+                 json = JSON.parse(response.response)
+            } catch (e) {
+                // A non 200 status code without json header is always considered as a server error.
+                return await this.retryOrThrowServerError(response, e)
+            }
 
             // todo: add automatic decoding here, so we know we are receiving what we expected with typings
             if (this.decoder) {
@@ -302,11 +332,37 @@ export class Request<T> {
 
             return new RequestResult(json);
         }
+
         if (this.decoder) {
-            // something went wrong
-            throw new Error("Received no decodeable content, but expected content");
+            // Expected content, but the server didn't respond with content
+            if (this.static.verbose) {
+                console.error(response.response);
+            }
+            return await this.retryOrThrowServerError(response, new Error("Missing JSON response from server"))
         }
 
-        return new RequestResult(await response.text()) as any;
+        return new RequestResult(await response.response) as any;
+    }
+
+    private async retryOrThrowServerError(response: XMLHttpRequest, e: Error) {
+        // Invalid json is considered as a server error
+        if (this.static.verbose) {
+            console.error(e);
+        }
+
+        // A middleware might decide here to retry instead of passing the error to the caller
+        let retry = false;
+        for (const middleware of this.getMiddlewares()) {
+            // Check if one of the middlewares decides to stop
+            if (middleware.shouldRetryServerError) {
+                retry = retry || (await middleware.shouldRetryServerError(this, response, e));
+            }
+        }
+
+        if (retry) {
+            // Retry
+            return await this.start();
+        }
+        throw e;
     }
 }

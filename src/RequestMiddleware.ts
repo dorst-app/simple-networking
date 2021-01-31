@@ -4,7 +4,8 @@ import { Request } from "./Request";
 
 export interface RequestMiddleware {
     onBeforeRequest?(request: Request<any>): Promise<void>;
-    shouldRetryError?(request: Request<any>, response: Response, error: SimpleErrors): Promise<boolean>;
+    shouldRetryError?(request: Request<any>, response: XMLHttpRequest, error: SimpleErrors): Promise<boolean>;
+    shouldRetryServerError?(request: Request<any>, response: XMLHttpRequest, error: Error): Promise<boolean>; // e.g. invalid json
     shouldRetryNetworkError?(request: Request<any>, error: Error): Promise<boolean>;
-    onNetworkResponse?(request: Request<any>, response: Response);
+    onNetworkResponse?(request: Request<any>, response: XMLHttpRequest);
 }
