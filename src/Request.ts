@@ -207,13 +207,21 @@ export class Request<T> {
             }
 
             let queryString = "";
-            if (this.query && Object.keys(this.query).length > 0) {
-                queryString =
+            if (this.query ) {
+                let query = this.query
+
+                if (isEncodeable(this.query)) {
+                    query = this.query.encode({ version: this.version ?? 0 })
+                }
+
+                if (Object.keys(query).length > 0) {
+                    queryString =
                     "?" +
-                    Object.keys(this.query)
-                        .filter((k) => this.query[k] !== undefined)
-                        .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(this.query[k]))
+                    Object.keys(query)
+                        .filter((k) => query[k] !== undefined)
+                        .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(query[k]))
                         .join("&");
+                }
             }
 
             if (this.static.verbose) {
