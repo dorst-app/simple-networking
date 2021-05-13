@@ -1,5 +1,5 @@
 // Requests use middleware to extend its behaviour
-import { Decoder, Encodeable, isEncodeable, ObjectData } from "@simonbackx/simple-encoding";
+import { Decoder, EncodableObject, encodeObject, ObjectData } from "@simonbackx/simple-encoding";
 import { SimpleErrors } from "@simonbackx/simple-errors";
 
 import { RequestMiddleware } from "./RequestMiddleware";
@@ -19,7 +19,7 @@ export interface RequestInitializer<T> {
     method: HTTPMethod;
     path: string;
     query?: any;
-    body?: any | Encodeable | Encodeable[] | FormData;
+    body?: EncodableObject | FormData;
     headers?: any;
     decoder?: Decoder<T>;
     version?: number;
@@ -43,7 +43,7 @@ export class Request<T> {
      * Content that will get encoded in the body of the request (only for non GET requests)
      * Should be FormData (use this for uploading files) or it will get encoded as JSON
      */
-    body: any | Encodeable | Encodeable[] | FormData | undefined;
+    body: EncodableObject | FormData | undefined;
 
     /// Shared middlewares that allows dependency injection here
     static sharedMiddlewares: RequestMiddleware[] = [];
@@ -179,28 +179,17 @@ export class Request<T> {
                     }
                 } else {
                     if (this.headers["Content-Type"] && (this.headers["Content-Type"] as string).startsWith("application/x-www-form-urlencoded")) {
-                        body = Object.keys(this.body)
-                            .filter((k) => this.body[k] !== undefined)
-                            .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(this.body[k]))
+                        const typeCopy = encodeObject(this.body, { version: this.version ?? 0 })
+                        if (typeCopy === null || typeCopy === undefined) {
+                            throw new Error("Invalid body, got null/undefined, which is not encodeable to a querystring")
+                        }
+                        body = Object.keys(typeCopy)
+                            .filter((k) => typeCopy[k] !== undefined)
+                            .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(typeCopy[k]))
                             .join("&");
                     } else {
                         this.headers["Content-Type"] = "application/json;charset=utf-8";
-
-                        if (Array.isArray(this.body)) {
-                            body = JSON.stringify(this.body.map((e) => {
-                                if (isEncodeable(this.body)) {
-                                    return e.encode({ version: this.version ?? 0 })
-                                } else {
-                                    return e
-                                }
-                            }));
-                        } else {
-                            if (isEncodeable(this.body)) {
-                                body = JSON.stringify(this.body.encode({ version: this.version ?? 0 }));
-                            } else {
-                                body = JSON.stringify(this.body);
-                            }
-                        }
+                        body = JSON.stringify(encodeObject(this.body, { version: this.version ?? 0 }))
                     }
                     
                 }
@@ -208,13 +197,9 @@ export class Request<T> {
 
             let queryString = "";
             if (this.query ) {
-                let query = this.query
+                const query = encodeObject(this.query, { version: this.version ?? 0 })
 
-                if (isEncodeable(this.query)) {
-                    query = this.query.encode({ version: this.version ?? 0 })
-                }
-
-                if (Object.keys(query).length > 0) {
+                if (query !== undefined && query !== null && Object.keys(query).length > 0) {
                     queryString =
                     "?" +
                     Object.keys(query)
