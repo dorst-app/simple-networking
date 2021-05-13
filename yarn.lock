@@ -456,10 +456,10 @@
     "@types/yargs" "^15.0.0"
     chalk "^3.0.0"
 
-"@simonbackx/simple-encoding@^2.2.2":
-  version "2.2.2"
-  resolved "https://registry.yarnpkg.com/@simonbackx/simple-encoding/-/simple-encoding-2.2.2.tgz#f932863340c76c5473ae9ab6af8b442654f36a41"
-  integrity sha512-E5L/Wtc8FaJZp1nbQpCstUvxlM/OQZda2vXaHcX63l86qAmXZFhIjMv70oP7kFzIZqFVFXnmRAGCohimL9XSuQ==
+"@simonbackx/simple-encoding@^2.2.3":
+  version "2.2.3"
+  resolved "https://registry.yarnpkg.com/@simonbackx/simple-encoding/-/simple-encoding-2.2.3.tgz#dc074c5ae24dbdb8ce0e914d8b4fb8deaea598d5"
+  integrity sha512-ebFYYbR96agzgqd1y5p9z5DpH+VbAAu68ydf36zjs1+2sUewyLlqaSE6c1EH/W2sgZM+hnoHmXzdD9LV/jJa2g==
 
 "@simonbackx/simple-errors@^1.3.0":
   version "1.3.0"
