@@ -124,6 +124,10 @@ export class Request<T> {
         RequestBag.get(owner)?.cancel()
     }
 
+    static isNetworkError(e: Error): boolean {
+        return !!((isSimpleError(e) || isSimpleErrors(e)) && (e.hasCode("network_error") || e.hasCode("network_timeout") || e.hasCode("network_abort")))
+    }
+
     private async fetch(data: {
         method: HTTPMethod;
         url: string;
