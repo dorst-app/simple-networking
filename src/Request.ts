@@ -2,6 +2,7 @@
 import { Decoder, EncodableObject, encodeObject, ObjectData } from "@simonbackx/simple-encoding";
 import { SimpleErrors } from "@simonbackx/simple-errors";
 
+import { RequestBag } from "./RequestBag";
 import { RequestMiddleware } from "./RequestMiddleware";
 import { Server } from "./Server";
 
@@ -24,6 +25,17 @@ export interface RequestInitializer<T> {
     decoder?: Decoder<T>;
     version?: number;
     timeout?: number; // optional (in ms). Defaults to 10 - 15 seconds
+    shouldRetry?: boolean;
+
+    /**
+     * If you want to associate a request bag to this request (so you can cancel all requests for a given instance easily and fast)
+     */
+    bag?: RequestBag;
+    
+    /**
+     * Shorthand for 'bag: RequestBag.getOrCreate(self)'
+     */
+    owner?: any;
 }
 
 export class Request<T> {
@@ -33,6 +45,12 @@ export class Request<T> {
     method: HTTPMethod;
     version?: number;
     headers: any;
+
+    /**
+     * Set to false to disable middleware retry logic entirely. When canceling a request, this will also
+     * disable retries
+     */
+    shouldRetry = true;
 
     /**
      * Data that will get encoded in the URL of the request.
@@ -57,7 +75,11 @@ export class Request<T> {
     /// Milliseconds for fetch to timeout
     timeout?: number
 
+    bag?: RequestBag;
+
     static verbose = false;
+
+    private XMLHttpRequest: XMLHttpRequest | null = null
 
     constructor(server: Server, request: RequestInitializer<T>) {
         this.server = server;
@@ -69,6 +91,10 @@ export class Request<T> {
         this.headers = request.headers ?? {};
         this.version = request.version;
         this.timeout = request.timeout;
+        this.shouldRetry = request.shouldRetry ?? this.shouldRetry
+        this.bag = request.bag ?? (request.owner ? RequestBag.getOrCreate(request.owner) : undefined)
+
+        this.bag?.addRequest(this)
     }
 
     get static(): typeof Request {
@@ -77,6 +103,25 @@ export class Request<T> {
 
     getMiddlewares(): RequestMiddleware[] {
         return Request.sharedMiddlewares.concat(this.middlewares);
+    }
+
+    /**
+     * Cancels any pending requests and also disables retries
+     */
+    cancel() {
+        this.shouldRetry = false
+        if (this.XMLHttpRequest) {
+            this.XMLHttpRequest.abort()
+            this.XMLHttpRequest = null
+        }
+    }
+
+    /**
+     * Cancel all requests with a given owner
+     * Shorthand to avoid RequestBag syntax.
+     */
+    static cancelAll(owner: any) {
+        RequestBag.get(owner)?.cancel()
     }
 
     private async fetch(data: {
@@ -103,16 +148,18 @@ export class Request<T> {
                         }
                 
                         finished = true
+                        this.XMLHttpRequest = null
                         resolve(request)
                     }
                 };
         
-                request.ontimeout = (e: ProgressEvent) => {
+                request.ontimeout = () => {
                     if (finished) {
                         // ignore duplicate events
                         return
                     }
                     finished = true
+                    this.XMLHttpRequest = null
                     reject(new Error("Timeout"))
                 };
         
@@ -123,7 +170,21 @@ export class Request<T> {
                     }
                     // Your request timed out
                     finished = true
-                    reject(e)
+                    this.XMLHttpRequest = null
+                    reject(new Error("Network error"))
+                };
+
+                request.onabort = () => {
+                    if (finished) {
+                        // ignore duplicate events
+                        return
+                    }
+                    finished = true
+                    this.XMLHttpRequest = null
+
+                    // Disable retries
+                    this.shouldRetry = false
+                    reject(new Error("Abort"))
                 };
                 
                 request.open(data.method, data.url)
@@ -137,6 +198,7 @@ export class Request<T> {
 
                 request.timeout = data.timeout
 
+                this.XMLHttpRequest = request
                 request.send(data.body)
             } catch (e) {
                 reject(e)
@@ -210,7 +272,7 @@ export class Request<T> {
             }
 
             if (this.static.verbose) {
-                console.log("Starting new reuest");
+                console.log("Starting new request");
                 console.log("New request", this.method, this.path, this.body, this.query, this.headers);
             }
 
@@ -234,19 +296,33 @@ export class Request<T> {
             // He might for example fire a timer to retry the request because of a network failure
             // Or it might decide to fetch a new access token because the current one is expired
             // They return a promise with a boolean value indicating that the request should get retried
-            let retry = false;
-            for (const middleware of this.getMiddlewares()) {
-                // Check if one of the middlewares decides to stop
-                if (middleware.shouldRetryNetworkError) {
-                    retry = retry || (await middleware.shouldRetryNetworkError(this, error));
+
+            if (this.shouldRetry) {
+                let retry = false;
+                for (const middleware of this.getMiddlewares()) {
+                    // Check if one of the middlewares decides to stop
+                    if (middleware.shouldRetryNetworkError) {
+                        retry = retry || (await middleware.shouldRetryNetworkError(this, error));
+                    }
+                }
+
+                // Sometimes, in the meantime, shouldRetry might have become false, so check again
+                if (retry && this.shouldRetry) {
+                    // Retry
+                    return await this.start();
                 }
             }
-            if (retry) {
-                // Retry
-                return await this.start();
+
+            // Notify middleware that we stop retrying
+            for (const middleware of this.getMiddlewares()) {
+                // Check if one of the middlewares decides to stop
+                if (middleware.onFatalNetworkError) {
+                    middleware.onFatalNetworkError(this, error);
+                }
             }
 
             // Failed and not caught
+            this.bag?.removeRequest(this)
             throw error;
         }
 
@@ -285,19 +361,23 @@ export class Request<T> {
                 }
 
                 // A middleware might decide here to retry instead of passing the error to the caller
-                let retry = false;
-                for (const middleware of this.getMiddlewares()) {
-                    // Check if one of the middlewares decides to stop
-                    if (middleware.shouldRetryError) {
-                        retry = retry || (await middleware.shouldRetryError(this, response, err));
+                if (this.shouldRetry) {
+                    let retry = false;
+                    for (const middleware of this.getMiddlewares()) {
+                        // Check if one of the middlewares decides to stop
+                        if (middleware.shouldRetryError) {
+                            retry = retry || (await middleware.shouldRetryError(this, response, err));
+                        }
+                    }
+
+                    // Sometimes, in the meantime, shouldRetry might have become false, so check again
+                    if (retry && this.shouldRetry) {
+                        // Retry
+                        return await this.start();
                     }
                 }
 
-                if (retry) {
-                    // Retry
-                    return await this.start();
-                }
-
+                this.bag?.removeRequest(this)
                 throw err;
             }
 
@@ -310,19 +390,20 @@ export class Request<T> {
             try {
                  json = JSON.parse(response.response)
             } catch (e) {
-                // A non 200 status code without json header is always considered as a server error.
+                // A 200 status code with invalid JSON is considered a server error
                 return await this.retryOrThrowServerError(response, e)
             }
 
-            // todo: add automatic decoding here, so we know we are receiving what we expected with typings
             if (this.decoder) {
                 const decoded = this.decoder?.decode(new ObjectData(json, { version: this.version ?? 0 }));
                 if (this.static.verbose) {
                     console.info(decoded);
                 }
+                this.bag?.removeRequest(this)
                 return new RequestResult(decoded);
             }
 
+            this.bag?.removeRequest(this)
             return new RequestResult(json);
         }
 
@@ -334,6 +415,7 @@ export class Request<T> {
             return await this.retryOrThrowServerError(response, new Error("Missing JSON response from server"))
         }
 
+        this.bag?.removeRequest(this)
         return new RequestResult(await response.response) as any;
     }
 
@@ -343,19 +425,23 @@ export class Request<T> {
             console.error(e);
         }
 
-        // A middleware might decide here to retry instead of passing the error to the caller
-        let retry = false;
-        for (const middleware of this.getMiddlewares()) {
-            // Check if one of the middlewares decides to stop
-            if (middleware.shouldRetryServerError) {
-                retry = retry || (await middleware.shouldRetryServerError(this, response, e));
+        if (this.shouldRetry) {
+            // A middleware might decide here to retry instead of passing the error to the caller
+            let retry = false;
+            for (const middleware of this.getMiddlewares()) {
+                // Check if one of the middlewares decides to stop
+                if (middleware.shouldRetryServerError) {
+                    retry = retry || (await middleware.shouldRetryServerError(this, response, e));
+                }
+            }
+
+            // Sometimes, in the meantime, shouldRetry might have become false, so check again
+            if (retry && this.shouldRetry) {
+                // Retry
+                return await this.start();
             }
         }
-
-        if (retry) {
-            // Retry
-            return await this.start();
-        }
+        this.bag?.removeRequest(this)
         throw e;
     }
 }
