@@ -1,6 +1,6 @@
 // Requests use middleware to extend its behaviour
 import { Decoder, EncodableObject, encodeObject, ObjectData } from "@simonbackx/simple-encoding";
-import { SimpleErrors } from "@simonbackx/simple-errors";
+import { isSimpleError, isSimpleErrors, SimpleError, SimpleErrors } from "@simonbackx/simple-errors";
 
 import { RequestBag } from "./RequestBag";
 import { RequestMiddleware } from "./RequestMiddleware";
@@ -160,7 +160,10 @@ export class Request<T> {
                     }
                     finished = true
                     this.XMLHttpRequest = null
-                    reject(new Error("Timeout"))
+                    reject(new SimpleError({
+                        code: "network_timeout",
+                        message: "Timeout"
+                    }))
                 };
         
                 request.onerror = (e: ProgressEvent) => {
@@ -171,7 +174,10 @@ export class Request<T> {
                     // Your request timed out
                     finished = true
                     this.XMLHttpRequest = null
-                    reject(new Error("Network error"))
+                    reject(new SimpleError({
+                        code: "network_error",
+                        message: "Network error"
+                    }))
                 };
 
                 request.onabort = () => {
@@ -184,7 +190,10 @@ export class Request<T> {
 
                     // Disable retries
                     this.shouldRetry = false
-                    reject(new Error("Abort"))
+                    reject(new SimpleError({
+                        code: "network_abort",
+                        message: "Network abort"
+                    }))
                 };
                 
                 request.open(data.method, data.url)
@@ -285,8 +294,7 @@ export class Request<T> {
             })
 
         } catch (error) {
-            // Todo: map the error in o
-            if (error.message === 'Timeout') {
+            if ((isSimpleError(error) || isSimpleErrors(error)) && error.hasCode('network_timeout')) {
                 // Increase next timeout (note: upload will stay 1 minute)
                 this.timeout = Math.max(timeout, 30*1000);
             }
