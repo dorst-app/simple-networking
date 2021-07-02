@@ -124,7 +124,7 @@ export class Request<T> {
         RequestBag.get(owner)?.cancel()
     }
 
-    static isNetworkError(e: Error): boolean {
+    static isNetworkError(e: Error): e is SimpleError | SimpleErrors {
         return !!((isSimpleError(e) || isSimpleErrors(e)) && (e.hasCode("network_error") || e.hasCode("network_timeout") || e.hasCode("network_abort")))
     }
 
