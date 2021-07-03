@@ -79,6 +79,8 @@ export class Request<T> {
 
     static verbose = false;
 
+    didFailNetwork = false
+
     private XMLHttpRequest: XMLHttpRequest | null = null
 
     constructor(server: Server, request: RequestInitializer<T>) {
@@ -110,10 +112,28 @@ export class Request<T> {
      */
     cancel() {
         this.shouldRetry = false
+
         if (this.XMLHttpRequest) {
             this.XMLHttpRequest.abort()
             this.XMLHttpRequest = null
+        } else {
+            // Probably a middleware that is running a timeout to retry it later on
+            // Immediately call all middlewares to notify them faster of this abort
+            // Notify middleware that we stop retrying
+            if (!this.didFailNetwork) {
+                this.didFailNetwork = true
+                for (const middleware of this.getMiddlewares()) {
+                    // Check if one of the middlewares decides to stop
+                    if (middleware.onFatalNetworkError) {
+                        middleware.onFatalNetworkError(this, new SimpleError({
+                            code: "network_abort",
+                            message: "Network abort"
+                        }));
+                    }
+                }
+            }
         }
+        
     }
 
     /**
@@ -309,7 +329,7 @@ export class Request<T> {
             // Or it might decide to fetch a new access token because the current one is expired
             // They return a promise with a boolean value indicating that the request should get retried
 
-            if (this.shouldRetry) {
+            if (this.shouldRetry && !this.didFailNetwork) {
                 let retry = false;
                 for (const middleware of this.getMiddlewares()) {
                     // Check if one of the middlewares decides to stop
@@ -319,17 +339,21 @@ export class Request<T> {
                 }
 
                 // Sometimes, in the meantime, shouldRetry might have become false, so check again
-                if (retry && this.shouldRetry) {
+                if (retry && this.shouldRetry && !this.didFailNetwork) {
                     // Retry
                     return await this.start();
                 }
             }
 
             // Notify middleware that we stop retrying
-            for (const middleware of this.getMiddlewares()) {
-                // Check if one of the middlewares decides to stop
-                if (middleware.onFatalNetworkError) {
-                    middleware.onFatalNetworkError(this, error);
+            if (!this.didFailNetwork) {
+                // On abort we call this faster if needed (e.g. when middleware is hanging)
+                this.didFailNetwork = true
+                for (const middleware of this.getMiddlewares()) {
+                    // Check if one of the middlewares decides to stop
+                    if (middleware.onFatalNetworkError) {
+                        middleware.onFatalNetworkError(this, error);
+                    }
                 }
             }
 
