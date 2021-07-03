@@ -336,6 +336,11 @@ export class Request<T> {
                     if (middleware.shouldRetryNetworkError) {
                         retry = retry || (await middleware.shouldRetryNetworkError(this, error));
                     }
+
+                    if (!this.shouldRetry || this.didFailNetwork) {
+                        // Stop the loop faster
+                        break
+                    }
                 }
 
                 // Sometimes, in the meantime, shouldRetry might have become false, so check again
