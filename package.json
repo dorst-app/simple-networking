@@ -4,7 +4,7 @@
     "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "sideEffects": false,
-    "version": "1.9.0",
+    "version": "1.9.1",
     "scripts": {
         "test": "jest",
         "build": " tsc -b . commonjs",
