@@ -26,6 +26,7 @@ export interface RequestInitializer<T> {
     version?: number;
     timeout?: number; // optional (in ms). Defaults to 10 - 15 seconds
     shouldRetry?: boolean;
+    allowErrorRetry?: boolean;
 
     /**
      * If you want to associate a request bag to this request (so you can cancel all requests for a given instance easily and fast)
@@ -51,6 +52,12 @@ export class Request<T> {
      * disable retries
      */
     shouldRetry = true;
+
+    /**
+     * Even when shouldRetry is false, still allow to retry normal valid errors
+     * often needed to refresh a token etc
+     */
+    allowErrorRetry = true;
 
     /**
      * Data that will get encoded in the URL of the request.
@@ -94,6 +101,7 @@ export class Request<T> {
         this.version = request.version;
         this.timeout = request.timeout;
         this.shouldRetry = request.shouldRetry ?? this.shouldRetry
+        this.allowErrorRetry = request.allowErrorRetry ?? this.allowErrorRetry
         this.bag = request.bag ?? (request.owner ? RequestBag.getOrCreate(request.owner) : undefined)
 
         this.bag?.addRequest(this)
@@ -112,6 +120,7 @@ export class Request<T> {
      */
     cancel() {
         this.shouldRetry = false
+        this.allowErrorRetry = false
 
         if (this.XMLHttpRequest) {
             this.XMLHttpRequest.abort()
@@ -402,7 +411,7 @@ export class Request<T> {
                 }
 
                 // A middleware might decide here to retry instead of passing the error to the caller
-                if (this.shouldRetry) {
+                if (this.shouldRetry || this.allowErrorRetry) {
                     let retry = false;
                     for (const middleware of this.getMiddlewares()) {
                         // Check if one of the middlewares decides to stop
@@ -412,7 +421,7 @@ export class Request<T> {
                     }
 
                     // Sometimes, in the meantime, shouldRetry might have become false, so check again
-                    if (retry && this.shouldRetry) {
+                    if (retry && (this.shouldRetry || this.allowErrorRetry)) {
                         // Retry
                         return await this.start();
                     }
