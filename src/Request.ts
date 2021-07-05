@@ -256,6 +256,16 @@ export class Request<T> {
             if (middleware.onBeforeRequest) await middleware.onBeforeRequest(this);
         }
 
+        if (this.didFailNetwork) {
+            // In the meantime, the request is canceled before it even started
+            // This can happen when the onBeforeRequest did something time intensive (e.g. refresh a token)
+            // and in the meantime, the request bag got canceled
+            throw new SimpleError({
+                code: "network_abort",
+                message: "Network abort"
+            }) 
+        }
+
         let response: XMLHttpRequest;
         let timeout = this.timeout ?? (this.method == "GET" ? 10 * 1000 : 15 * 10000)
 
