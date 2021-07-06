@@ -37,6 +37,7 @@ export interface RequestInitializer<T> {
      * Shorthand for 'bag: RequestBag.getOrCreate(self)'
      */
     owner?: any;
+    overrideXMLHttpRequest?: XMLHttpRequest;
 }
 
 export class Request<T> {
@@ -90,6 +91,11 @@ export class Request<T> {
 
     private XMLHttpRequest: XMLHttpRequest | null = null
 
+    /**
+     * Set a custom implementation of XMLHttpRequest, useful when using e.g. Capacitor
+     */
+    overrideXMLHttpRequest?: any
+
     constructor(server: Server, request: RequestInitializer<T>) {
         this.server = server;
         this.method = request.method;
@@ -103,7 +109,7 @@ export class Request<T> {
         this.shouldRetry = request.shouldRetry ?? this.shouldRetry
         this.allowErrorRetry = request.allowErrorRetry ?? this.allowErrorRetry
         this.bag = request.bag ?? (request.owner ? RequestBag.getOrCreate(request.owner) : undefined)
-
+        this.overrideXMLHttpRequest = request.overrideXMLHttpRequest
         this.bag?.addRequest(this)
     }
 
@@ -166,7 +172,7 @@ export class Request<T> {
     }): Promise<XMLHttpRequest> {
         return new Promise((resolve, reject) => {
             try {
-                const request = new XMLHttpRequest();
+                const request: XMLHttpRequest = this.overrideXMLHttpRequest ? (new this.overrideXMLHttpRequest()) : new XMLHttpRequest();
                 let finished = false
 
                 request.onreadystatechange = (e: Event) => {
