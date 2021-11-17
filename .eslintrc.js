@@ -25,13 +25,12 @@ module.exports = {
                 parser: "@typescript-eslint/parser",
                 project: ["./tsconfig.json"]
             },
-            plugins: ["@typescript-eslint", "jest", "simple-import-sort"],
+            plugins: ["@typescript-eslint", "simple-import-sort"],
             extends: [
                 "eslint:recommended",
                 "plugin:@typescript-eslint/eslint-recommended",
                 "plugin:@typescript-eslint/recommended",
                 "plugin:@typescript-eslint/recommended-requiring-type-checking",
-                "plugin:jest/recommended",
             ],
             rules: {
                 "no-console": "off",
