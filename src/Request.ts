@@ -101,12 +101,12 @@ export class Request<T> {
                             // should call handleError or handleTimeout
                             return;
                         }
-                
+
                         finished = true
                         resolve(request)
                     }
                 };
-        
+
                 request.ontimeout = (e: ProgressEvent) => {
                     if (finished) {
                         // ignore duplicate events
@@ -115,7 +115,7 @@ export class Request<T> {
                     finished = true
                     reject(new Error("Timeout"))
                 };
-        
+
                 request.onerror = (e: ProgressEvent) => {
                     if (finished) {
                         // ignore duplicate events
@@ -125,7 +125,7 @@ export class Request<T> {
                     finished = true
                     reject(e)
                 };
-                
+
                 request.open(data.method, data.url)
 
                 for (const key in data.headers) {
@@ -202,7 +202,7 @@ export class Request<T> {
                             }
                         }
                     }
-                    
+
                 }
             }
 
