@@ -7,7 +7,7 @@
     "version": "1.4.1",
     "scripts": {
         "build": " tsc -b . commonjs",
-        "build:full": "rm -r ./dist && rm -r ./commonjs/dist && tsc -b . commonjs",
+        "build:full": "rm -rf ./dist && rm -rf ./commonjs/dist && tsc -b . commonjs",
         "lint": "eslint . --ext .js,.ts"
     },
     "files": [
