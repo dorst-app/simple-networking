@@ -44,6 +44,7 @@ class Request {
         return new Promise((resolve, reject) => {
             try {
                 const request = new XMLHttpRequest();
+                this.request = request;
                 let finished = false;
                 request.onreadystatechange = (e) => {
                     if (finished) {
