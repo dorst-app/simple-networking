@@ -53,6 +53,7 @@ export class Request {
                             return;
                         }
                         finished = true;
+                        this.request = null;
                         resolve(request);
                     }
                 };
@@ -62,6 +63,7 @@ export class Request {
                         return;
                     }
                     finished = true;
+                    this.request = null;
                     reject(new Error("Timeout"));
                 };
                 request.onerror = (e) => {
@@ -71,6 +73,7 @@ export class Request {
                     }
                     // Your request timed out
                     finished = true;
+                    this.request = null;
                     reject(e);
                 };
                 request.onabort = (e) => {
@@ -79,6 +82,7 @@ export class Request {
                         return;
                     }
                     finished = true;
+                    this.request = null;
                     reject(e);
                 };
                 request.open(data.method, data.url);

@@ -116,6 +116,7 @@ export class Request<T> {
                         }
 
                         finished = true
+                        this.request = null
                         resolve(request)
                     }
                 };
@@ -126,6 +127,7 @@ export class Request<T> {
                         return
                     }
                     finished = true
+                    this.request = null
                     reject(new Error("Timeout"))
                 };
 
@@ -136,6 +138,7 @@ export class Request<T> {
                     }
                     // Your request timed out
                     finished = true
+                    this.request = null
                     reject(e)
                 };
 
@@ -145,7 +148,7 @@ export class Request<T> {
                         return
                     }
                     finished = true
-
+                    this.request = null
                     reject(e)
                 };
 
